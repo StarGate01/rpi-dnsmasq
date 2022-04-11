@@ -1,0 +1,26 @@
+kind: pipeline
+name: default
+
+volumes:
+  - name: docker_socket
+    host:
+      path: /var/run/docker.sock
+
+steps:
+- name: build
+  image: stargate01/buildx
+  commands:
+    - docker run --dns=8.8.8.8 --rm --privileged docker/binfmt:a7996909642ee92942dcd6cff44b9b95f08dad64
+    - export BUILDER_ID="crosscomp-$(cat /proc/self/cgroup | head -1 | cut -d '/' -f 3)"
+    - docker buildx create --use --driver-opt network=host --name $BUILDER_ID
+    - docker buildx inspect --bootstrap
+    - docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD
+    - docker buildx build --platform linux/arm/v7,linux/arm64/v8 --output=type=image,push=true --progress tty -t stargate01/rpi-dnsmasq .
+    - docker buildx rm $BUILDER_ID
+  volumes:
+    - name: docker_socket
+      path: /var/run/docker.sock
+  environment:
+    DOCKER_USERNAME: stargate01
+    DOCKER_PASSWORD:
+        from_secret: docker_password
